@@ -1,0 +1,9 @@
+[package]
+name = "ldk-node-offers-receive-test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ldk-node = { git = "https://github.com/lightningdevkit/ldk-node.git", rev = "9c4404190db99666f64a869738671d42b4991cd4" }
