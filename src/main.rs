@@ -22,6 +22,7 @@ fn main() {
 	let mut config = Config::default();
 	config.storage_dir_path = args[1].clone();
 	config.log_level = LogLevel::Trace;
+	config.anchor_channels_config = None;
 
 	config.listening_addresses = match SocketAddress::from_str(&args[2]) {
 		Ok(addr) => Some(vec![addr]),
