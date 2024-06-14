@@ -1,14 +1,15 @@
-use std::io;
-use std::io::prelude::*;
 use std::str::FromStr;
 use std::sync::Arc;
+
+use tokio::signal::unix::SignalKind;
 
 use ldk_node::lightning::ln::msgs::SocketAddress;
 use ldk_node::{Builder, Config, Event, LogLevel};
 
 use ldk_node::bitcoin::Network;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	let args: Vec<String> = std::env::args().collect();
 
 	if args.len() < 5 {
@@ -55,61 +56,73 @@ fn main() {
 		None
 	};
 
+	let mut sigterm_stream = match tokio::signal::unix::signal(SignalKind::terminate()) {
+		Ok(stream) => stream,
+		Err(e) => {
+			println!("Failed to register for SIGTERM stream: {}", e);
+			std::process::exit(-1);
+		},
+	};
+
 	let node = Arc::new(builder.build().unwrap());
+	println!("Starting up...");
 	node.start().unwrap();
 
-	println!("NODE_ID: {}", node.node_id());
+	println!("NODE_ID {}", node.node_id());
+	println!("Waiting for an inbound channel...");
 
 	let event_node = Arc::clone(&node);
-	std::thread::spawn(move || loop {
-		let event = event_node.wait_next_event();
-		match event {
-			Event::ChannelPending { channel_id, counterparty_node_id, .. } => {
-				println!(
-					"CHANNEL_PENDING: {} from counterparty {}",
-					channel_id, counterparty_node_id
-				);
-			},
-			Event::ChannelReady { channel_id, counterparty_node_id, .. } => {
-				println!(
-					"CHANNEL_READY: {} from counterparty {:?}",
-					channel_id, counterparty_node_id
-				);
+	loop {
+		tokio::select! {
+			event = event_node.next_event_async() => {
+				match event {
+					Event::ChannelPending { channel_id, counterparty_node_id, .. } => {
+						println!(
+							"CHANNEL_PENDING: {} from counterparty {}",
+							channel_id, counterparty_node_id
+							);
+					},
+					Event::ChannelReady { channel_id, counterparty_node_id, .. } => {
+						println!(
+							"CHANNEL_READY: {} from counterparty {:?}",
+							channel_id, counterparty_node_id
+							);
 
-				let offer = if let Some(amount_msat) = offer_amount_msat {
-					event_node.bolt12_payment().receive(amount_msat, "TEST OFFER").unwrap()
-				} else {
-					event_node
-						.bolt12_payment()
-						.receive_variable_amount("VAR-AMT TEST OFFER")
-						.unwrap()
-				};
-				println!("CREATED_OFFER: {}", offer);
+						let offer = if let Some(amount_msat) = offer_amount_msat {
+							event_node.bolt12_payment().receive(amount_msat, "TEST OFFER").unwrap()
+						} else {
+							event_node
+								.bolt12_payment()
+								.receive_variable_amount("VAR-AMT TEST OFFER")
+								.unwrap()
+						};
+						println!("CREATED_OFFER: {}", offer);
+					},
+					Event::PaymentReceived { payment_id, payment_hash, amount_msat } => {
+						println!(
+							"PAYMENT_RECEIVED: with id {:?}, hash {}, amount_msat {}",
+							payment_id, payment_hash, amount_msat
+							);
+					},
+					_ => {},
+				}
+				event_node.event_handled();
 			},
-			Event::PaymentReceived { payment_id, payment_hash, amount_msat } => {
-				println!(
-					"PAYMENT_RECEIVED: with id {:?}, hash {}, amount_msat {}",
-					payment_id, payment_hash, amount_msat
-				);
-			},
-			_ => {},
+		_ = tokio::signal::ctrl_c() => {
+			println!("Received CTRL-C, shutting down..");
+			break;
 		}
-		event_node.event_handled();
-	});
+		_ = sigterm_stream.recv() => {
+			println!("Received SIGTERM, shutting down..");
+				break;
+		}
+		}
+	}
 
-	pause();
-
-	node.stop().unwrap();
-}
-
-fn pause() {
-	let mut stdin = io::stdin();
-	let mut stdout = io::stdout();
-
-	// We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-	write!(stdout, "Press any key to continue...").unwrap();
-	stdout.flush().unwrap();
-
-	// Read a single byte and discard
-	let _ = stdin.read(&mut [0u8]).unwrap();
+	std::thread::spawn(move || {
+		node.stop().unwrap();
+		println!("Shutdown complete..");
+	})
+	.join()
+	.unwrap();
 }

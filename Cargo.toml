@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 ldk-node = { git = "https://github.com/lightningdevkit/ldk-node.git", rev = "9c4404190db99666f64a869738671d42b4991cd4" }
+tokio = { version = "1.38.0", features = ["full"] }
