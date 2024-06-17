@@ -23,7 +23,7 @@ async fn main() {
 	let mut config = Config::default();
 	config.storage_dir_path = args[1].clone();
 	config.log_level = LogLevel::Trace;
-	config.anchor_channels_config = None;
+	config.anchor_channels_config.as_mut().map(|acc| acc.per_channel_reserve_sats = 0);
 
 	config.listening_addresses = match SocketAddress::from_str(&args[2]) {
 		Ok(addr) => Some(vec![addr]),
