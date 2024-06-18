@@ -41,7 +41,7 @@ async fn main() {
 		},
 	};
 
-	let mut builder = Builder::from_config(config);
+	let mut builder = Builder::from_config(config.clone());
 	builder.set_esplora_server(args[4].clone());
 
 	let offer_amount_msat = if args.len() > 5 {
@@ -68,7 +68,7 @@ async fn main() {
 	println!("Starting up...");
 	node.start().unwrap();
 
-	println!("NODE_ID {}", node.node_id());
+	println!("CONNECTION_STRING: {}@{}", node.node_id(), config.listening_addresses.as_ref().unwrap().first().unwrap());
 	println!("Waiting for an inbound channel...");
 
 	let event_node = Arc::clone(&node);
