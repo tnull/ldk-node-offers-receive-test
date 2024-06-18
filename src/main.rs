@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::signal::unix::SignalKind;
 
 use ldk_node::lightning::ln::msgs::SocketAddress;
-use ldk_node::{Builder, Config, Event, LogLevel};
+use ldk_node::{Builder, ChannelConfig, Config, Event, LogLevel};
 
 use ldk_node::bitcoin::Network;
 
@@ -82,11 +82,16 @@ async fn main() {
 							channel_id, counterparty_node_id
 							);
 					},
-					Event::ChannelReady { channel_id, counterparty_node_id, .. } => {
+					Event::ChannelReady { channel_id, counterparty_node_id, user_channel_id, .. } => {
 						println!(
 							"CHANNEL_READY: {} from counterparty {:?}",
 							channel_id, counterparty_node_id
 							);
+
+						let channel_config = Arc::new(ChannelConfig::default());
+						let max_msats = 21_000_000 * 1_0000_0000 * 1000;
+						channel_config.set_max_dust_htlc_exposure_from_fixed_limit(max_msats);
+						node.update_channel_config(&user_channel_id, counterparty_node_id.unwrap(), channel_config).unwrap();
 
 						let offer = if let Some(amount_msat) = offer_amount_msat {
 							event_node.bolt12_payment().receive(amount_msat, "TEST OFFER").unwrap()
