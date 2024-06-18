@@ -68,7 +68,11 @@ async fn main() {
 	println!("Starting up...");
 	node.start().unwrap();
 
-	println!("CONNECTION_STRING: {}@{}", node.node_id(), config.listening_addresses.as_ref().unwrap().first().unwrap());
+	println!(
+		"CONNECTION_STRING: {}@{}",
+		node.node_id(),
+		config.listening_addresses.as_ref().unwrap().first().unwrap()
+	);
 	println!("Waiting for an inbound channel...");
 
 	let event_node = Arc::clone(&node);
@@ -92,6 +96,8 @@ async fn main() {
 						let max_msats = 21_000_000 * 1_0000_0000 * 1000;
 						channel_config.set_max_dust_htlc_exposure_from_fixed_limit(max_msats);
 						node.update_channel_config(&user_channel_id, counterparty_node_id.unwrap(), channel_config).unwrap();
+
+						tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
 						let offer = if let Some(amount_msat) = offer_amount_msat {
 							event_node.bolt12_payment().receive(amount_msat, "TEST OFFER").unwrap()
